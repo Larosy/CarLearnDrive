@@ -16,17 +16,17 @@ def get_map_data(map_index):
         # Harita 1: Basit Klasik Pist
         points = [(150, 450), (150, 150), (400, 150), (600, 350), (800, 150), (1050, 150), (1050, 650), (600, 650), (400, 500), (150, 650)]
         start_pos = (150, 450)
-        road_width = 100
+        road_width = 150
     elif map_index == 1:
         # Harita 2: Basit Oval
         points = [(200, 400), (200, 200), (1000, 200), (1000, 600), (200, 600)]
         start_pos = (200, 400)
-        road_width = 130
+        road_width = 150
     else:
         # Harita 3: Zorlu Zikzak (Kıvrımlı, Dar)
         points = [(100, 700), (100, 100), (400, 100), (400, 700), (700, 700), (700, 100), (1000, 100), (1000, 700)]
         start_pos = (100, 600)
-        road_width = 80
+        road_width = 150
         
     return points, start_pos, road_width
 
