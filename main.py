@@ -1,5 +1,7 @@
 import pygame
 import sys
+import random
+import math
 from evolution import GeneticAlgorithm
 
 # --- Sabitler ---
@@ -47,6 +49,53 @@ def draw_track(surface, map_index):
     pygame.draw.circle(surface, (0, 200, 0), start_pos, 15)
     return start_pos
 
+def get_random_road_point(points, is_closed):
+    """Pist üzerinde rastgele bir x,y koordinatı döndürür."""
+    max_idx = len(points) - 1 if is_closed else len(points) - 2
+    idx = random.randint(0, max_idx)
+    p1 = points[idx]
+    p2 = points[(idx + 1) % len(points)]
+    t = random.random()
+    x = p1[0] + t * (p2[0] - p1[0])
+    y = p1[1] + t * (p2[1] - p1[1])
+    return int(x), int(y)
+
+def stats_screen(screen, stats_history, gen_count, pop_size, mut_rate):
+    """Tüm arabalar yarışı bitirdiğinde gösterilecek istatistik ekranı."""
+    font_title = pygame.font.SysFont("Arial", 45, bold=True)
+    font_text = pygame.font.SysFont("Arial", 30)
+    
+    while True:
+        screen.fill((240, 240, 240))
+        title = font_title.render("All Cars Finished! Simulation Completed", True, (0, 150, 0))
+        screen.blit(title, (WIDTH//2 - title.get_width()//2, 50))
+        
+        y = 150
+        texts = [
+            f"Total Generations Required: {gen_count}",
+            f"Population Size: {pop_size}",
+            f"Mutation Rate: {mut_rate}",
+            "",
+            "Finishers per Generation (Last 10):"
+        ]
+        for t in texts:
+            render_t = font_text.render(t, True, (0, 0, 0))
+            screen.blit(render_t, (WIDTH//2 - render_t.get_width()//2, y))
+            y += 40
+            
+        start_idx = max(0, len(stats_history) - 10)
+        for i in range(start_idx, len(stats_history)):
+            history_text = font_text.render(f"Gen {i+1}:  {stats_history[i]} cars finished", True, (0, 0, 0))
+            screen.blit(history_text, (WIDTH//2 - history_text.get_width()//2, y))
+            y += 35
+            
+        pygame.display.flip()
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                pygame.quit()
+                sys.exit()
+
 def main_menu(screen, clock):
     font_title = pygame.font.SysFont("Arial", 50, bold=True)
     font_sub = pygame.font.SysFont("Arial", 30)
@@ -77,10 +126,12 @@ def parameter_menu(screen, clock):
     
     pop_options = [20, 50, 100, 200]
     mut_options = [0.01, 0.05, 0.1, 0.2]
+    gen_options = [5, 10, 20, 50, 100]
     
     pop_idx = 1 # Default: 50
     mut_idx = 2 # Default: 0.1
-    selected = 0 # 0: Population, 1: Mutation
+    gen_idx = 2 # Default: 20
+    selected = 0 # 0: Population, 1: Mutation, 2: Max Gen
     
     while True:
         screen.fill((240, 240, 240))
@@ -90,15 +141,17 @@ def parameter_menu(screen, clock):
         screen.blit(title, (WIDTH//2 - title.get_width()//2, 100))
         screen.blit(hint, (WIDTH//2 - hint.get_width()//2, 160))
         
-        # Seçili olanı yeşil göster
         color_pop = (0, 150, 0) if selected == 0 else (0, 0, 0)
         color_mut = (0, 150, 0) if selected == 1 else (0, 0, 0)
+        color_gen = (0, 150, 0) if selected == 2 else (0, 0, 0)
         
         pop_text = font_item.render(f"Population Size:  <  {pop_options[pop_idx]}  >", True, color_pop)
         mut_text = font_item.render(f"Mutation Rate:  <  {mut_options[mut_idx]}  >", True, color_mut)
+        gen_text = font_item.render(f"Max Generations:  <  {gen_options[gen_idx]}  >", True, color_gen)
         
-        screen.blit(pop_text, (WIDTH//2 - pop_text.get_width()//2, 300))
-        screen.blit(mut_text, (WIDTH//2 - mut_text.get_width()//2, 400))
+        screen.blit(pop_text, (WIDTH//2 - pop_text.get_width()//2, 280))
+        screen.blit(mut_text, (WIDTH//2 - mut_text.get_width()//2, 360))
+        screen.blit(gen_text, (WIDTH//2 - gen_text.get_width()//2, 440))
         
         pygame.display.flip()
         clock.tick(FPS)
@@ -108,16 +161,20 @@ def parameter_menu(screen, clock):
                 pygame.quit()
                 sys.exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
-                    selected = 1 - selected
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % 3
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % 3
                 elif event.key == pygame.K_LEFT:
                     if selected == 0: pop_idx = max(0, pop_idx - 1)
-                    else: mut_idx = max(0, mut_idx - 1)
+                    elif selected == 1: mut_idx = max(0, mut_idx - 1)
+                    else: gen_idx = max(0, gen_idx - 1)
                 elif event.key == pygame.K_RIGHT:
                     if selected == 0: pop_idx = min(len(pop_options)-1, pop_idx + 1)
-                    else: mut_idx = min(len(mut_options)-1, mut_idx + 1)
+                    elif selected == 1: mut_idx = min(len(mut_options)-1, mut_idx + 1)
+                    else: gen_idx = min(len(gen_options)-1, gen_idx + 1)
                 elif event.key == pygame.K_RETURN:
-                    return pop_options[pop_idx], mut_options[mut_idx]
+                    return pop_options[pop_idx], mut_options[mut_idx], gen_options[gen_idx]
 
 def map_selection_menu(screen, clock):
     font_title = pygame.font.SysFont("Arial", 40, bold=True)
@@ -161,34 +218,39 @@ def main():
     pygame.display.set_caption("Neuroevolution Car Simulation")
     clock = pygame.time.Clock()
 
-    # 1. Ana Giriş Ekranı
     main_menu(screen, clock)
-    
-    # 2. Parametre Ayarlama Menüsü
-    pop_size, mut_rate = parameter_menu(screen, clock)
-    
-    # 3. Harita Seçim Menüsü
+    pop_size, mut_rate, max_generations = parameter_menu(screen, clock)
     map_index = map_selection_menu(screen, clock)
 
-    # Seçilen Haritayı Çiz ve Başlangıç Noktasını Al
     track_surface = pygame.Surface((WIDTH, HEIGHT))
     start_pos = draw_track(track_surface, map_index)
     start_x, start_y = start_pos
+    
+    points, _, _ = get_map_data(map_index)
+    is_closed = (map_index != 2)
+    # Finish line: End of points for Map 3, Start pos for Maps 0 and 1
+    finish_x, finish_y = points[-1] if map_index == 2 else start_pos
 
-    # Genetik Algoritmayı Kullanıcı Parametreleriyle Başlat
     ga = GeneticAlgorithm(population_size=pop_size, mutation_rate=mut_rate)
     cars = ga.create_initial_population(start_x, start_y)
 
     generation_font = pygame.font.SysFont("Arial", 30)
     info_font = pygame.font.SysFont("Arial", 20)
 
-    # Ana Döngü
     running = True
     frame_count = 0
-    max_frames = 20 * FPS # Her nesil için maksimum 20 saniye süre
+    max_frames = 20 * FPS 
+    
+    stats_history = []
+    boxes = []
 
     while running:
         frame_count += 1
+        
+        # Her 5 saniyede bir yeni kutu (engel) ekle
+        if frame_count % (5 * FPS) == 0:
+            bx, by = get_random_road_point(points, is_closed)
+            boxes.append((bx, by))
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -196,33 +258,64 @@ def main():
                 pygame.quit()
                 sys.exit()
 
-        # Ekranı temizle ve pisti çiz
-        screen.blit(track_surface, (0, 0))
+        # Dinamik yüzey: Kutular sensörler tarafından beyaz (duvar) olarak algılansın diye
+        # Ana pistin bir kopyasını alıp kutuları üzerine çiziyoruz.
+        current_track = track_surface.copy()
+        for bx, by in boxes:
+            pygame.draw.rect(current_track, WHITE, (bx - 10, by - 10, 20, 20))
+
+        screen.blit(current_track, (0, 0))
 
         alive_count = 0
+        current_finished = sum(1 for car in cars if getattr(car, 'finished', False))
         
-        # Tüm arabaları güncelle ve çiz
         for car in cars:
-            if car.alive:
-                alive_count += 1
-            car.update(track_surface)
-            car.draw(screen)
+            # Arabalar eğer bitirmemişse hareket etsin
+            if not getattr(car, 'finished', False):
+                if car.alive:
+                    alive_count += 1
+                car.update(current_track)
+                car.draw(screen)
+                
+                # Bitiş kontrolü (Mesafe 1000'den büyükse ve bitiş çizgisindeyse)
+                if car.alive and car.distance > 1000 and math.hypot(car.x - finish_x, car.y - finish_y) < 150:
+                    car.finished = True
+                    car.alive = False # Çarpma sayılmaması için bir sonraki nesilde çok yüksek fitness alacak
+                    car.distance += 5000 # Yarışı bitiren arabaya devasa bir ödül
+                    current_finished += 1
+        
+        # Eğer herkes bitirdiyse oyunu sonlandır ve istatistik göster
+        if current_finished == pop_size:
+            stats_history.append(current_finished)
+            stats_screen(screen, stats_history, ga.generation, pop_size, mut_rate)
+            return # Oyunu bitir
 
         # Süre dolduysa veya hiç araba kalmadıysa yeni nesle geç
         if alive_count == 0 or frame_count > max_frames:
-            print(f"Generation {ga.generation} bitti. Yeni nesil üretiliyor...")
+            stats_history.append(current_finished)
+            
+            # Maksimum jenerasyon hedefine ulaşıldıysa oyunu bitir
+            if ga.generation >= max_generations:
+                stats_screen(screen, stats_history, ga.generation, pop_size, mut_rate)
+                return
+                
             cars = ga.next_generation(cars, start_x, start_y)
-            frame_count = 0 # Sayacı sıfırla
+            frame_count = 0 
+            boxes.clear() # Kutuları yeni nesil için sıfırla
+            for car in cars:
+                car.finished = False
 
-        # Bilgileri ekrana yazdır
         gen_text = generation_font.render(f"Generation: {ga.generation}", True, (0, 0, 0))
-        alive_text = info_font.render(f"Alive: {alive_count} / {pop_size}", True, (0, 0, 0))
+        alive_text = info_font.render(f"Driving: {alive_count} / {pop_size - current_finished}", True, (0, 0, 0))
+        finished_text = info_font.render(f"Finished: {current_finished} / {pop_size}", True, (0, 0, 150))
         time_text = info_font.render(f"Time: {frame_count // FPS} / {max_frames // FPS}s", True, (0, 0, 0))
+        box_text = info_font.render(f"Obstacles: {len(boxes)}", True, (150, 0, 0))
         
-        # Yazıları beyaz zemin üzerine (sol üst) koyalım ki net okunsun
         screen.blit(gen_text, (20, 20))
         screen.blit(alive_text, (20, 60))
-        screen.blit(time_text, (20, 90))
+        screen.blit(finished_text, (20, 90))
+        screen.blit(time_text, (20, 120))
+        screen.blit(box_text, (20, 150))
 
         pygame.display.flip()
         clock.tick(FPS)
