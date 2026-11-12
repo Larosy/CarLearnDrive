@@ -1,4 +1,3 @@
 neat-python
 pygame-ce
-
-
+numpy
